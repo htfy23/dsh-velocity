@@ -1,0 +1,27 @@
+# dsh-velocity bundle patch
+#
+# One row, whose `id` matches the package name.
+#
+# `dsh-client-modules` mounts a package's browser half on the row whose
+# specifier is the package name, and the Plugins page resolves a bundle's
+# title/description/icon by that same row. An `id` unrelated to the package
+# (`blackhole`, the pre-rename name) left the row unmatchable, so the loader
+# reported the bundle as broken.
+#
+# Each config key below is read by the plugin itself; unknown keys fall back
+# to defaults, so a malformed value never blocks activation.
+- insert:
+    - id: dsh-velocity
+      name: dsh-velocity
+      config:
+        # Empty means: auto-detect (the auditor engine, then the bundled copy;
+        # `python` on Windows, `python3` elsewhere).
+        scriptPath: ''
+        pythonPath: ''
+        # Wall-clock budget for one auditor run.
+        timeoutMs: 120000
+        # Wall-clock budget for one batch-retrospective action (extract/attribute
+        # legitimately take minutes).
+        batchTimeoutMs: 900000
+        # Inject the "when is a self-audit worth it" prompt section.
+        promptGuide: true
