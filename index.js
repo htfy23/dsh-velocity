@@ -487,9 +487,8 @@ function lessonsTool(settings) {
           type: 'string',
           enum: ['query', 'list', 'record', 'feedback'],
           description:
-            'query looks up the single most relevant verified lesson for a tool error (once per error per '
-            + 'session); list reads the library; record adds or re-records one lesson; feedback records what '
-            + 'happened after a lesson was recommended or adopted.',
+            'query: verified lesson for a tool error (deduped per session). list: read library. '
+            + 'record: add a lesson. feedback: what happened after it was used.',
         },
         json: {
           type: 'boolean',
@@ -502,20 +501,15 @@ function lessonsTool(settings) {
         error: {
           type: 'string',
           description:
-            'query: the verbatim error line (copy it exactly — do not paraphrase or drop the "Error:" prefix). '
-            + 'Paths and URLs are normalized before matching, so stored "PATH"-style pattern keywords hit real errors.',
+            'query: verbatim error line — do not paraphrase or drop "Error:". Paths/URLs are normalized before matching.',
         },
         session: {
           type: 'string',
-          description:
-            'query: session identity for once-per-error dedup. Defaults to the current DSH session id; '
-            + 'omit to disable dedup (then query writes nothing at all).',
+          description: 'query: dedup key, defaults to current session. Omit to disable dedup (writes nothing).',
         },
         lessons_path: {
           type: 'string',
-          description:
-            'query/feedback: absolute path of a library file instead of the engine\'s own lessons.jsonl. '
-            + 'Use it for test or isolated-copy runs; leaving it unset targets the real library.',
+          description: 'query/feedback: alternate library path (tests/isolated runs). Unset = real library.',
         },
         kind: {
           type: 'string',
@@ -528,15 +522,13 @@ function lessonsTool(settings) {
         },
         evidence: {
           type: 'string',
-          description:
-            'record: where it came from, such as "session-abc T10.S2". '
-            + 'feedback: the observed result that supports the outcome.',
+          description: 'record: source, e.g. "session-abc T10.S2". feedback: the observed result (required for success/failure).',
         },
         match: {
           type: 'string',
           description:
-            'record: comma-separated keywords; the lesson is only suggested when every keyword appears in the '
-            + 'matching signal context. Without match, or scope: general, it is stored but never suggested.',
+            'record: comma-separated keywords. Suggested only when ALL appear in the signal context; '
+            + 'without match (or with scope=general) it is stored but never suggested.',
         },
         scope: {
           type: 'string',
@@ -551,8 +543,7 @@ function lessonsTool(settings) {
           type: 'string',
           enum: FEEDBACK_EVENTS,
           description:
-            'feedback: recommended (it really was suggested), adopted (it really was used), success or failure '
-            + '(used, then verified). success and failure also count as adopted.',
+            'feedback: recommended / adopted / success / failure (used+verified). success and failure imply adopted.',
         },
         lesson_id: {
           type: 'string',
@@ -688,17 +679,13 @@ function batchReviewTool(settings) {
   return {
     name: 'blackhole_batch_review',
     description:
-      'Batch retrospective over ended DSH sessions (the time-blackhole-audit skill\'s batch_review.py): '
-      + 'extract time-concentrated evidence spans from the ~20 most recently ended sessions, aggregate '
-      + 'cross-session patterns into prioritized groups, attribute root causes (one real-model call per '
-      + 'group, ~10-15 s each), and write only model-verified avoidable patterns into the lesson library '
-      + '(automatic backup before any real write; necessary and insufficient-evidence groups are never '
-      + 'written). Run actions in order: extract → groups → attribute → write. Use small `gids` batches '
-      + '(3-10 groups); minutes are normal for one call. '
-      + 'action=quick is the one-click preview: one call runs the whole chain (select → extract → '
-      + 'groups → context → attribute, capped at the 3 most promising groups) and returns an action '
-      + 'list of up to 3 evidence-backed blockers WITHOUT writing any library; confirmed writes '
-      + 'reuse the write action (pass attrib_path/groups_path pointing at the quick products).',
+      'Batch retrospective over ended sessions: aggregate cross-session patterns into prioritized '
+      + 'groups, attribute root causes (one model call per group, 10-15 s), write only verified '
+      + 'avoidable patterns (auto-backup; necessary/insufficient groups never written). '
+      + 'Chain: extract -> groups -> attribute -> write, 3-10 gids per batch; minutes per call are normal. '
+      + 'action=quick does the whole chain in one call (capped at the 3 most promising groups) and '
+      + 'writes nothing — returns up to 3 evidence-backed blockers. To persist a quick result, call '
+      + 'write with attrib_path/groups_path from it.',
     parameters: {
       type: 'object',
       properties: {
@@ -970,7 +957,8 @@ function promptSection() {
     name: 'blackhole-audit',
     order: 60,
     text: [
-      '`blackhole_audit` 从会话转录里机械地找低效信号（目标是**把任务跑得更快**，不是找茬）：失败循环、重复调用、反复编辑同处、无产出长段、任务轮询、超时转后台、串行长调用（同类调用连续多次，含「每次很快但次数很多」的短调用型）、盲改缺验证（同一文件多次成功编辑但期间没重读/没跑测试）、串行未并行（整个窗口的并行度体检：subagent/后台/单步多调用占比过低）、起后台即阻塞等（起了 run_in_background 又在 3 次调用内 wait=true 干等）、盲等（sleep 类纯阻塞）、命令可合并（连续多步各发一条命令，本可合并成一条）。',
+      '`blackhole_audit` 从会话转录里机械地找低效信号（目标是**把任务跑得更快**，不是找茬）。'
+      + '信号种类与判据由工具自己给出，不用记——只看它报出来的证据。',
       '触发点：连续出现同类失败、准备重复试过的操作、多轮轮询没有新状态、或长时间探索后说不清最近拿到了什么可验证结论。默认审计当前会话，用 since 收窄窗口。不要每步都审计——只读分析、排除假设、等待必要计算都可能是合理工作。',
       '**长任务必须中途自查**（实测教训：一个跨度 319 小时的会话，7 次审计全部发生在最后 7% 的时间里，7 个信号在前 316 小时就已积累完毕——等于全程没被纠正）。判据：距上次审计已过 100+ 次工具调用、或刚完成一个可交付节点、或单会话已超 2 小时，就主动跑一次 `blackhole_audit`（用 since 只看最近一段，便宜）。不要等任务做完或用户质疑才查。',
       '**等待时间是最大的可回收成本**（实测 24 个会话 11.2 小时）：①预期 >60 秒的命令一开始就 run_in_background 起后台，起完立刻去做与之无关的工作，用 wait=false 探一次；绝对不要起了后台又 wait=true 干等（等于同步调用）。②不要用 sleep 盲等——等状态就轮询状态，等资源就起后台做别的，给进程留余量就缩到 1-3 秒并检查就绪。③无数据依赖的多条命令合并成一条（cmd1; cmd2 && cmd3）或同一消息里并发发；省的是 LLM 轮次不是命令时间，每步固定约 8 秒，与输出量无关——所以减少步数才是提速主途径。',
@@ -978,7 +966,8 @@ function promptSection() {
 '信号是待核实的线索，不是结论：读证据再决定继续、缩小范围或改变方法，不要仅因耗时就打断有进展的任务。',
       '核实后的解法用 `blackhole_lessons` 的 record 沉淀（带 match 关键词或 scope: general 才会被建议），用 feedback 记录被推荐、被采用以及采用后的验证结果；记录次数不等于验证成功。',
       '工具报错第一次出现时，先用 `blackhole_lessons` 的 query 查经验：action=query、tool=工具名、error=报错原文整行（逐字复制，不要改写摘要或省略 Error: 前缀；默认按当前会话去重，同一错误只提示一次）。命中就按返回的「下一步」行动、完成后把实际结果 feedback 回填到同一条经验（success/failure 必须附证据，证据不足保持待验证）；未命中就按常规排查，不要原样重试同一操作。query/feedback 可传 lessons_path 指向隔离副本做演练，不传即真实库。',
-      '阶段性回顾多会话用 `blackhole_batch_review`：要快速拿结论直接 action=quick（一键预览：选最近已结束任务、提取、归因最有价值的 ≤3 组，返回最多 3 个有证据的卡点行动清单，不写库）；要逐步控制用 extract→groups 看证据组清单，attribute 按 gids 分批归因（真实模型，每组约 10-20s），write 只落可避免结论（真写正式库需 confirm:true，测试传 lessons_path；写 quick 的结果须同时传 attrib_path 和 groups_path 指向 quick 产物）。quick 给出的写入命令经用户确认后执行，可节省耗时只在有复跑数据时采信。',
+      '阶段性回顾多会话用 `blackhole_batch_review`：要快速拿结论用 action=quick（一次调用跑完整条链，'
+      + '不写库，返回 ≤3 条有证据的卡点）；要逐步控制就 extract→groups→attribute→write。',
     ].join('\n'),
   }
 }

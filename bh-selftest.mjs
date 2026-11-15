@@ -164,15 +164,15 @@ const knownKinds = [...kindsBlock.slice(0, kindsBlock.indexOf(']')).matchAll(/["
   .map((m) => m[1])
 const promptText = captured.sections.map((s) => s.text).join('\n')
 check('prompt lists every engine signal', knownKinds.length >= 12, String(knownKinds.length))
-// 信号清单必须出现在「信号列举」那一句里（不能仅靠别处偶然提到，
-// 例如「sleep 盲等」这样的解释性文字会让朴素 includes 误判为已覆盖）。
-const kindSentence = promptText.split('\n').find((line) => line.includes('blackhole_audit') && line.includes('无效信号'))
-  ?? promptText.split('\n').find((line) => line.includes('机械地找低效信号'))
-  ?? ''
-check('prompt has signal enumeration line', kindSentence.length > 0)
-for (const k of knownKinds) {
-  check(`enumerates signal ${k}`, kindSentence.includes(k))
-}
+// 12 个信号必须被「工具可发现」，但不必写进提示词——`blackhole_lessons` 的 kind
+// 枚举就是权威清单，模型查经验时自然会看到。写进提示词是重复计费（每轮都算 token），
+// 与「控制 token 增量」的目标冲突。这里断言：每个信号都出现在某个工具的 schema 里。
+const schemaText = JSON.stringify(captured.tools.map((t) => ({ d: t.description, p: t.parameters })))
+check('all signals reachable via tool schema', knownKinds.every((k) => schemaText.includes(k)),
+      knownKinds.filter((k) => !schemaText.includes(k)).join(','))
+// 提示词反过来不该复述整张信号表：超过 4 个信号名就算重复计费
+const duplicated = knownKinds.filter((k) => promptText.includes(k)).length
+check('prompt does not duplicate the signal table', duplicated <= 4, String(duplicated))
 // 速度规则必须落进提示词，否则模型不会主动规避等待
 check('prompt has background-first rule', promptText.includes('run_in_background'))
 check('prompt bans blocking wait on background', promptText.includes('wait=true'))
