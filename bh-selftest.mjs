@@ -148,6 +148,16 @@ check('module name', name === 'dsh-velocity', name)
   // 一旦引入就变成硬依赖，必须同时从 optional 改为必需。
   const src = readFileSync(join(PLUGIN, 'index.js'), 'utf8')
   check('index.js has no @deepseek-ai import', !/from\s+['"]@deepseek-ai\//.test(src))
+  // 版本号语义：README/CHANGELOG 承诺的是「首次公开版本」，改动包名或 patch id
+  // 这类破坏性变更时必须升 major。这里只守住基本形状，防止误写成 0.x 或带后缀。
+  const ver = String(pkg.version ?? '')
+  check('version is semver major.minor.patch', /^\d+\.\d+\.\d+$/.test(ver), ver)
+  check('public release starts at 1.0.0', ver === '1.0.0', ver)
+  // CHANGELOG 必须存在且记录了当前版本，否则发布说明会与代码脱节
+  const changelog = readFileSync(join(PLUGIN, 'CHANGELOG.md'), 'utf8')
+  check('CHANGELOG documents current version', changelog.includes(`## ${ver}`), ver)
+  check('CHANGELOG lists every tool', ['blackhole_audit', 'blackhole_lessons',
+    'blackhole_batch_review', 'velocity_speedup'].every((t) => changelog.includes(t)))
 }
 }
 check('injects tools', Array.isArray(inject) && inject.includes('tools'), JSON.stringify(inject))
