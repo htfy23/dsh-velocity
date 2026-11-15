@@ -9,7 +9,9 @@
 #   [x] 根目录有 cordis.patch.yml
 #   [x] 仓库有真实可用代码（index.js + assets/ 引擎，非占位）
 #   [x] peerDependencies 带显式预发布分支
-#   [ ] 仓库创建满 1 天 —— created_at 2026-11-15T07:59:26Z，需等到 11-16 之后
+#   [x] GitHub Release + 预构建 tarball（latest/download 已验证 200）
+#   [x] 市场图标：assets/icon-180.png（GitHub 托管 PNG，非 SVG）
+#   [ ] 仓库创建满 1 天 —— created_at 2026-11-15T07:59:26Z
 #   [ ] 加 dsh-plugin topic —— 仓库 About 齿轮里加
 #
 # description 含 ": " 必须整行加引号（否则 YAML 当嵌套键解析失败），所以用单行引号写法。
@@ -20,9 +22,5 @@ category: tools
 description:
   en: 'Audits DSH session logs for reclaimable wait time — starting a background job then blocking on it, blind sleeps, independent commands split across turns, and slow commands run to timeout — sums those into one figure, and A/Bs a new conversation against an old one to report the speedup in percent.'
   zh: '审计 DSH 会话里的可回收等待——起了后台又阻塞等、盲等 sleep、本可合并的分命令、慢命令前台跑到超时——汇总成一个可净省的时长，并用新对话对比旧对话报出加速百分比。'
-
-# 可选，当前先不启用：
-# icon:  必须是 GitHub 托管的位图（png/jpg/webp），SVG 会被拒。
-#        需要先放一张 180x180 PNG 到 assets/icon-180.png。
-# tarball: 预构建安装包，免 allowBuilds 授权。需要先建 Release；
-#          资产名不要带版本号，否则下次发版 latest/download 链接会 404。
+icon: https://raw.githubusercontent.com/htfy23/dsh-velocity/main/assets/icon-180.png
+tarball: https://github.com/htfy23/dsh-velocity/releases/latest/download/dsh-velocity.tgz
