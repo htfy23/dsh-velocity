@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-velocity",
+    "description": "Measures how much of a task is pure wait (blocking waits, blind sleeps, unmergeable commands, timeouts) — those durations add up to net savings. Ships a verified lesson library and new-vs-old conversation A/B verification."
+  }
+}

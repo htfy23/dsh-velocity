@@ -1,0 +1,20 @@
+# 忽略本地产物与状态
+node_modules/
+.audit_state/
+.query_state/
+
+# 本地跑出来的语料产物（不入库；用 BLACKHOLE_CORPUS 指向本地目录即可复用）
+assets/eval/batch_evidence*.json
+assets/eval/batch_attribution*.json
+lessons.jsonl.bak-*
+
+# 经验库本体：这是运行期数据，不是源码
+lessons.jsonl
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.tmp
