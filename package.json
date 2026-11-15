@@ -41,5 +41,13 @@
       "inject": []
     }
   },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <0.2.3-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
   "private": true
 }

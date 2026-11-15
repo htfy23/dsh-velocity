@@ -134,6 +134,21 @@ check('module name', name === 'dsh-velocity', name)
 {
   const pkg = JSON.parse(readFileSync(join(PLUGIN, 'package.json'), 'utf8'))
   check('dsh.client.platform declared', pkg.dsh?.client?.platform === 'web', JSON.stringify(pkg.dsh?.client))
+// 宿主依赖必须声明：插件不 import 任何 @deepseek-ai/* 包（只用 node: 内置），
+// 但它依赖 Host 提供的 ctx.tools / ctx.get('systemPrompt')。声明 peer 让装在
+// 过旧宿主上时能被依赖检查拦下，而不是运行时静默失效。
+{
+  const pkg = JSON.parse(readFileSync(join(PLUGIN, 'package.json'), 'utf8'))
+  const peer = pkg.peerDependencies ?? {}
+  check('declares host peer dependency', Object.keys(peer).length > 0, JSON.stringify(peer))
+  check('host peer is @deepseek-ai/dsh', '@deepseek-ai/dsh' in peer, Object.keys(peer).join(','))
+  check('host peer allows optional install',
+        pkg.peerDependenciesMeta?.['@deepseek-ai/dsh']?.optional === true)
+  // 反向守卫：源码不得出现对 @deepseek-ai/* 的运行时 import——
+  // 一旦引入就变成硬依赖，必须同时从 optional 改为必需。
+  const src = readFileSync(join(PLUGIN, 'index.js'), 'utf8')
+  check('index.js has no @deepseek-ai import', !/from\s+['"]@deepseek-ai\//.test(src))
+}
 }
 check('injects tools', Array.isArray(inject) && inject.includes('tools'), JSON.stringify(inject))
 apply(makeCtx())
