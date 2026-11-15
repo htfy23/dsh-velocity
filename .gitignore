@@ -18,3 +18,7 @@ Thumbs.db
 .idea/
 *.log
 *.tmp
+
+# 构建产物
+dsh-velocity.tgz
+dsh-velocity-*.tgz
