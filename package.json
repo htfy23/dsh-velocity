@@ -22,6 +22,12 @@
     "icon.svg",
     "locale/",
     "assets/",
+    "!assets/.audit_state/",
+    "!assets/.query_state/",
+    "!assets/lessons.jsonl",
+    "!assets/lessons.jsonl.bak-*",
+    "!assets/eval/batch_evidence*.json",
+    "!assets/eval/batch_attribution*.json",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
