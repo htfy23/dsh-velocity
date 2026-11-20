@@ -152,7 +152,7 @@ check('module name', name === 'dsh-velocity', name)
   // 这类破坏性变更时必须升 major。这里只守住基本形状，防止误写成 0.x 或带后缀。
   const ver = String(pkg.version ?? '')
   check('version is semver major.minor.patch', /^\d+\.\d+\.\d+$/.test(ver), ver)
-  check('public release starts at 1.0.0', ver === '1.0.0', ver)
+  check('version is at least 1.0.0', /^\d+\.\d+\.\d+$/.test(ver) && Number(ver.split('.')[0]) >= 1, ver)
   // CHANGELOG 必须存在且记录了当前版本，否则发布说明会与代码脱节
   const changelog = readFileSync(join(PLUGIN, 'CHANGELOG.md'), 'utf8')
   check('CHANGELOG documents current version', changelog.includes(`## ${ver}`), ver)
@@ -188,6 +188,12 @@ check('prompt has background-first rule', promptText.includes('run_in_background
 check('prompt bans blocking wait on background', promptText.includes('wait=true'))
 check('prompt warns against blind sleep', promptText.includes('sleep 盲等'))
 check('prompt advises merging commands', promptText.includes('合并成一条'))
+// subagent 并行是四大提速手段之一，必须写进提示词。历史教训：提示词只覆盖了
+// 后台/sleep/合并三条，subagent 一次都没出现，于是模型不会主动扇出。
+// 依据：subagent 调用约 0.1s 即返回 started subagent <id>，执行在子会话异步跑，
+// N 个独立子任务同消息并起的墙钟是 max 而非 sum（实测子会话累计 332 分钟）。
+check('prompt tells the model to fan out subagents', promptText.includes('subagent'))
+check('prompt explains subagent is non-blocking', promptText.includes('fire-and-forget'))
 // 新对话验证的引导必须写进提示词：否则模型不会去跑 A/B，也就报不出加速%
 check('prompt mentions speedup verification', promptText.includes('velocity_speedup'))
 check('prompt explains new-conversation rule', promptText.includes('新开的对话'))

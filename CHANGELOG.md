@@ -3,6 +3,28 @@
 Notable changes to `dsh-velocity`. This is the first public release; earlier
 internal iterations are not versioned here.
 
+## 1.0.1
+
+Prompt guidance only — no detector or API change.
+
+The resident speed rules covered three of the four ways to buy wall-clock time:
+backgrounding a slow command, not sleeping blindly, and merging independent
+commands. **Fanned-out subagents were missing entirely** — the word "subagent"
+never appeared in the injected prompt, so the model had no reason to reach for it.
+
+That gap is worth closing because a `subagent` call is fire-and-forget: it returns
+`started subagent <id>` in about 0.1 s and the work runs asynchronously in a child
+session. Starting N independent subagents in one message makes wall clock `max`
+instead of `sum`. Measured on 29 real calls, child sessions accumulated 332
+minutes of activity — run serially, that would have been 5.5 hours of wall clock.
+
+Note this is why subagents are *not* in SPEED_KINDS: those signals measure wasted
+time already spent in the parent transcript, whereas subagent fan-out is an
+accelerant whose payoff lives in other sessions. What the parent can be blamed
+for is starting them one per turn; that is what 串行未并行 flags.
+
+Self-test now guards both facts: the prompt must mention `subagent` and must
+explain that the call is non-blocking.
 ## 1.0.0
 
 First public release.
