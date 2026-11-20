@@ -9,7 +9,7 @@ import urllib.request
 
 OWNER = "htfy23"
 REPO = "dsh-velocity"
-TAG = "v1.0.0"
+TAG = os.environ.get("RELEASE_TAG", "v1.0.0")
 ASSET_NAME = "dsh-velocity.tgz"      # 不带版本号：latest/download 只解析 latest，文件名照字面取
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
@@ -43,7 +43,7 @@ def main():
     # 1) 建 Release（已存在则复用）
     status, doc = call("POST", "/repos/%s/%s/releases" % (OWNER, REPO), {
         "tag_name": TAG,
-        "name": "dsh-velocity 1.0.0",
+        "name": "dsh-velocity " + TAG.lstrip("v"),
         "body": (
             "First public release.\n\n"
             "- **12 session signals**: four speed signals whose durations add up to "

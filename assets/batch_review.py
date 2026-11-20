@@ -1519,7 +1519,22 @@ def run_write_lessons(groups_json, attrib_json, out_json, lessons_paths,
 
 # ---------------------------------------------------------------- main
 
+def _out():
+    """把 stdout/stderr 固定成 UTF-8。
+
+    blackhole.py 一直这么做；这两个脚本原先没做，于是输出走控制台代码页
+    （中文 Windows 上是 GBK 936）。插件侧按 UTF-8 解码，中文会变乱码，
+    跨机器/跨代码页的调用也不稳定。
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+
 def main(argv=None):
+    _out()
     global opt_mod
     lessons_paths = {
         "work": os.path.join(WORK, "lessons.jsonl"),

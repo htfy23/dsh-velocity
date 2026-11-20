@@ -3,6 +3,47 @@
 Notable changes to `dsh-velocity`. This is the first public release; earlier
 internal iterations are not versioned here.
 
+## 1.0.2
+
+### New signal: `subagent 串行`
+
+A subagent call is fire-and-forget — it returns `started subagent <id>` in about
+0.1 s and the work runs in a child session. That means the parent transcript
+cannot see the wall-clock cost: `tool_interval` on the call is 0.1 s, not the
+minutes the child actually took. So starting N independent subagents one per
+turn (wall clock `sum`) instead of in one message (wall clock `max`) was
+previously invisible.
+
+The detector now reads the child id out of the result text (it is the child's
+session id), looks that session up, and computes the loss as `sum − max`. It is
+deliberately conservative:
+
+- only **adjacent steps in the same turn** count — a gap or a turn change is more
+  likely a real dependency (you read the previous result before deciding)
+- two or more subagents in the *same* step means they were already fanned out,
+  so no loss is recorded
+- unreadable child sessions are skipped rather than guessed
+- at most 8 child sessions are read per analysis, and the lookup never recurses
+  into a child's own analysis
+
+Its `sev` is that `sum − max`, so the signal is counted in `SPEED_KINDS` and
+appears in the reclaimable-time total alongside the four existing speed signals.
+
+On the current corpus it fires on 0 of 39 sessions: subagents are already being
+fanned out when used. The guidance and the measurement are there for when they
+are not.
+
+### Fixed: two scripts emitted GBK instead of UTF-8
+
+`verify_speedup.py` and `batch_review.py` never reconfigured stdout, unlike
+`blackhole.py`. On a Chinese Windows console (code page 936) their output was
+GBK while the plugin decodes UTF-8 — Chinese came out as mojibake and
+`UnicodeDecodeError` broke the CLI tests. Both now call the same `_out()` helper
+`blackhole.py` uses.
+
+### Tests
+
+588 engine tests (21 new for the signal), 116 plugin self-test assertions.
 ## 1.0.1
 
 Prompt guidance only — no detector or API change.

@@ -30,7 +30,7 @@ const DEFAULT_BATCH_TIMEOUT_MS = 900_000
 /** Guard against a pathological report reaching the model in full. */
 const MAX_STREAM_CHARS = 4 * 1024 * 1024
 
-const LESSON_KINDS = ['失败循环', '重复调用', '反复编辑同处', '无产出长段', '任务轮询', '超时转后台', '串行长调用', '盲改缺验证', '串行未并行', '起后台即阻塞等', '盲等', '命令可合并']
+const LESSON_KINDS = ['失败循环', '重复调用', '反复编辑同处', '无产出长段', '任务轮询', '超时转后台', '串行长调用', '盲改缺验证', '串行未并行', '起后台即阻塞等', '盲等', '命令可合并', 'subagent 串行']
 const FEEDBACK_EVENTS = ['recommended', 'adopted', 'success', 'failure']
 const AUDIT_MODES = ['summary', 'brief', 'review', 'full', 'json']
 const BATCH_ACTIONS = ['extract', 'groups', 'context', 'attribute', 'write', 'quick']

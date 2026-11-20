@@ -80,6 +80,15 @@ POLL_LIKE = {"job_output", "job_list"}
 # 真能并行的入口。判据同 AGENTS.md：subagent / 并发工具调用 / 后台作业。
 DELEGATE_LIKE = {"subagent", "subagent_fork", "spawn_teammate", "workflow"}
 
+# subagent 的结果文本形如 "started subagent <uuid>"，而该 uuid 就是子会话的
+# session id —— 能反查到子会话自己的转录，从而取到它的真实活跃时长。
+_SUBAGENT_ID_RE = re.compile(
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
+
+# 一次分析最多读这么多个子会话：--trend 会逐会话复用这段逻辑，
+# 不设上限会把一次聚合放大成几百次额外的读盘 + 解压。
+MAX_SUBAGENT_LOOKUP = 8
+
 TRUNCATION_WARNING = "压缩日志未完整读出；仅分析已读部分（文件可能仍在写入或被截断）"
 
 # 各信号需要模型/人工核查的问题——脚本不做因果判断，这里把问题问对。
@@ -96,6 +105,7 @@ VERIFY_QUESTIONS = {
     "串行长调用": "这些同类调用之间是否存在数据依赖？不依赖就该并发；串行是任务必需还是只是写法习惯？",
     "盲改缺验证": "改动之间为什么既没重读也没跑测试？如果这次改动没生效，能否从输出判断卡在哪一步？",
     "串行未并行": "这串调用里是否有互不依赖的项？有就并发（subagent / 后台作业 / 同一条消息多工具），确属依赖链就保持串行。",
+    "subagent 串行": "这几个子任务分步起，是不是因为要看上一步的产出？不需要就该在同一条消息里并起——墙钟取 max 而不是 sum。",
 }
 
 STATUS_MEANING = {
@@ -1032,9 +1042,136 @@ def _parallel_hole(para, rows, calls, total):
     }
 
 
+# ---------------------------------------------------------------- subagent 串行
+
+
+def _step_key_adjacent(a, b):
+    """两个 (turn, step) 是否同一轮里紧邻。
+
+    只有紧邻的步才可能是「本该并起、却分两次发」。跨轮或跳跃的间隔
+    更可能是「看到上一步结果才决定起下一个」，那是真依赖，不能算浪费。
+    """
+    return (isinstance(a[0], int) and isinstance(b[0], int) and a[0] == b[0]
+            and isinstance(a[1], int) and isinstance(b[1], int)
+            and b[1] == a[1] + 1)
+
+
+def _child_active_seconds(child_id, index, cache, depth):
+    """子会话的活跃秒数；读不到返回 None。cache 让同一次分析内不重复读。"""
+    if child_id in cache:
+        return cache[child_id]
+    value = None
+    path = index.get(child_id)
+    if path is not None:
+        try:
+            rep = analyze(read_events(path), _depth=depth + 1)
+            if rep.get("status") != "insufficient_data":
+                value = float(rep.get("active") or 0.0)
+        except Exception:
+            value = None
+    cache[child_id] = value
+    return value
+
+
+def _subagent_serial_hole(calls, results, total, depth=0):
+    """subagent 串行：分步起 N 个本可一条消息并起的子任务。
+
+    为什么单列这一类：subagent 调用是 fire-and-forget（约 0.1 秒返回
+    started subagent <id>），墙钟成本不在父会话的调用时长里，而在子会话本身。
+    N 个互不依赖的子任务并起 → 墙钟取 max；分步串起 → 取 sum。
+    损失 = sum - max，这才是可回收的那一段——父会话自己量不出来，
+    必须反查子会话的 active。
+
+    只在「同一轮里紧邻的步」之间认定；同一步 >=2 个说明已经并起了，不计损失。
+    读不到子会话时长时保守跳过，不猜。
+    """
+    per_step = {}
+    for c in calls.values():
+        if c["name"] not in DELEGATE_LIKE:
+            continue
+        r = results.get(c["id"])
+        if r is None:
+            continue
+        mt = _SUBAGENT_ID_RE.search(r.get("text") or "")
+        if not mt:
+            continue
+        key = (c.get("turn"), c.get("step"))
+        per_step.setdefault(key, []).append((c, mt.group(1)))
+    if not per_step:
+        return None
+
+    ordered = sorted(per_step.keys(),
+                     key=lambda k: (k[0] if isinstance(k[0], int) else 0,
+                                    k[1] if isinstance(k[1], int) else 0))
+    runs = []
+    cur = []
+    prev = None
+    for key in ordered:
+        items = per_step[key]
+        if len(items) >= 2:                     # 已并起，所在段断开
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur, prev = [], key
+            continue
+        if cur and prev is not None and not _step_key_adjacent(prev, key):
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur = []
+        cur.append(items[0])
+        prev = key
+    if len(cur) >= 2:
+        runs.append(cur)
+    if not runs:
+        return None
+
+    index = {}
+    for p in session_files():
+        try:
+            index[rid_of(p).replace("session-", "")] = p
+        except Exception:
+            continue
+
+    cache = {}
+    loss = 0.0
+    known = []
+    for run in runs:
+        durs = []
+        for _c, cid in run:
+            if len(cache) >= MAX_SUBAGENT_LOOKUP:
+                break
+            d = _child_active_seconds(cid, index, cache, depth)
+            if d is None:
+                break
+            durs.append(d)
+        if len(durs) >= 2:
+            saved = sum(durs) - max(durs)
+            loss += saved
+            known.append((len(durs), saved))
+    if not known or loss < 60.0:
+        return None
+
+    longest = max(known, key=lambda x: x[1])
+    return {
+        "kind": "subagent 串行",
+        "sev": loss,
+        "ratio": loss / total if total else 0.0,
+        "evidence": "%d 段分步启动的 subagent（最长一段 %d 个），并起可省 %s" % (
+            len(known), longest[0], fmt_dur(loss)),
+        "detail": "subagent 调用约 0.1 秒返回子会话 id，墙钟成本在子会话本身；"
+                  "N 个互不依赖的子任务分步串起，墙钟是 sum 不是 max",
+        "action": "确认这些子任务之间没有数据依赖（不需要看上一步产出再决定下一步）："
+                  "无依赖就在**同一条消息里并发发起 N 个 subagent**，墙钟取最大值。"
+                  "有依赖（A 的结论是 B 的输入）就保持串行，本信号不必处理",
+        "tools": sorted({c["name"] for run in runs for c, _cid in run}),
+        "ctx": _capped_ctx(itertools.chain(
+            ["subagent 串行 并发 并行"],
+            (brief_args(c, 160) for run in runs[:2] for c, _cid in run[:2])), 1200),
+    }
+
+
 # ---------------------------------------------------------------- analyze
 
-def analyze(evs, since_min=None):
+def analyze(evs, since_min=None, _depth=0):
     if since_min is not None and (not math.isfinite(since_min) or since_min <= 0):
         raise AuditInputError("--since 必须为正的有限分钟数")
     all_calls, all_results, steps, missing_keys = build(evs)
@@ -1685,6 +1822,14 @@ def analyze(evs, since_min=None):
     if para_hole is not None:
         holes.append(para_hole)
 
+    # 8c) subagent 串行：分步起本可并起的子任务，损失用子会话耗时算。
+    #     读子会话是额外 I/O，所以只在真有 delegate 调用、且不在子会话里时进入
+    #     （_depth>0 表示当前正在读子会话，避免递归展开）。
+    if para["subagent"] and _depth == 0:
+        sub_hole = _subagent_serial_hole(calls, results, total, _depth)
+        if sub_hole is not None:
+            holes.append(sub_hole)
+
     # 9) 盲改缺验证：同一文件 ≥3 次成功编辑，覆盖的窗口内既没有重读该文件，
     #    也没有跑测试。「改动是否有效」无法机械判定，这里只报代理事实：
     #    改了很多次却没有任何验证动作。已被「反复编辑同处」按 old_string
@@ -1821,6 +1966,7 @@ KNOWN_KINDS = [    "任务轮询", "无产出长段", "超时转后台",
     "起后台即阻塞等",
     "盲等",
     "命令可合并",
+    "subagent 串行",
 ]
 
 DEFAULT_LESSONS = [
@@ -2578,7 +2724,10 @@ def brief(rep):
 
 # 「速度型」信号：它们的 sev 是可直接回收的等待/轮次时间，而不是"相关步骤耗时"。
 # 其它信号（失败循环/反复编辑等）的 sev 是受影响步骤的总时长，不能当作可回收时间相加。
-SPEED_KINDS = ("起后台即阻塞等", "盲等", "命令可合并", "超时转后台")
+# 「subagent 串行」也计入：它的 sev 是 sum - max，即并行本可省下的墙钟，
+# 与其余四项同为「可直接回收的等待」而非「受影响步骤时长」。
+SPEED_KINDS = ("起后台即阻塞等", "盲等", "命令可合并", "超时转后台",
+               "subagent 串行")
 
 
 def _speed_summary(agg_sec):

@@ -1,62 +1,60 @@
 {
-    "name":  "dsh-velocity",
-    "version":  "1.0.1",
-    "description":  "Session velocity auditor: measures reclaimable wait time (blocking waits, blind sleeps, unmergeable commands, timeouts), tracks verified lessons, and reports the speedup percentage per round.",
-    "license":  "MIT",
-    "keywords":  [
-                     "dsh",
-                     "dsh-plugin",
-                     "deepseek-harness",
-                     "velocity",
-                     "audit",
-                     "time-waste",
-                     "session-analysis",
-                     "lessons"
-                 ],
-    "engines":  {
-                    "node":  "\u003e=20"
-                },
-    "files":  [
-                  "index.js",
-                  "cordis.patch.yml",
-                  "icon.svg",
-                  "locale/",
-                  "assets/",
-                  "!assets/.audit_state/",
-                  "!assets/.query_state/",
-                  "!assets/lessons.jsonl",
-                  "!assets/lessons.jsonl.bak-*",
-                  "!assets/eval/batch_evidence*.json",
-                  "!assets/eval/batch_attribution*.json",
-                  "README.md",
-                  "CHANGELOG.md",
-                  "LICENSE"
-              ],
-    "type":  "module",
-    "exports":  {
-                    ".":  "./index.js",
-                    "./locale/*.json":  "./locale/*.json",
-                    "./icon":  "./icon.svg"
-                },
-    "dsh":  {
-                "bundle":  {
-                               "patch":  "./cordis.patch.yml"
-                           },
-                "client":  {
-                               "platform":  "web",
-                               "immediately":  false,
-                               "inject":  [
-
-                                          ]
-                           }
-            },
-    "peerDependencies":  {
-                             "@deepseek-ai/dsh":  "\u003e=0.2.0-0 \u003c0.2.2-0 || \u003e=0.2.2-rc.1 \u003c0.2.3-0"
-                         },
-    "peerDependenciesMeta":  {
-                                 "@deepseek-ai/dsh":  {
-                                                          "optional":  true
-                                                      }
-                             },
-    "private":  true
+  "name": "dsh-velocity",
+  "version": "1.0.2",
+  "description": "Session velocity auditor: measures reclaimable wait time (blocking waits, blind sleeps, unmergeable commands, timeouts), tracks verified lessons, and reports the speedup percentage per round.",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "velocity",
+    "audit",
+    "time-waste",
+    "session-analysis",
+    "lessons"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/",
+    "assets/",
+    "!assets/.audit_state/",
+    "!assets/.query_state/",
+    "!assets/lessons.jsonl",
+    "!assets/lessons.jsonl.bak-*",
+    "!assets/eval/batch_evidence*.json",
+    "!assets/eval/batch_attribution*.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": false,
+      "inject": []
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-0 <0.2.2-0 || >=0.2.2-rc.1 <0.2.3-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "private": true
 }

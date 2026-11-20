@@ -60,7 +60,22 @@ def active_sessions(limit=6):
     return out
 
 
+def _out():
+    """把 stdout/stderr 固定成 UTF-8。
+
+    blackhole.py 一直这么做；这两个脚本原先没做，于是输出走控制台代码页
+    （中文 Windows 上是 GBK 936）。插件侧按 UTF-8 解码，中文会变乱码，
+    跨机器/跨代码页的调用也不稳定。
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+
 def main():
+    _out()
     ap = argparse.ArgumentParser(description="新对话 A/B：提示词改动是否降低了浪费率")
     ap.add_argument("--baseline", help="未加载新提示词的会话 id（旧对话）")
     ap.add_argument("--candidate", help="加载了新提示词的会话 id（新对话）")
@@ -71,9 +86,15 @@ def main():
     a = ap.parse_args()
 
     if a.list:
+        rows = [{"session": rid, "idle_min": round(age, 1)}
+                for rid, age in active_sessions(12)]
+        if a.json:
+            import json
+            print(json.dumps({"sessions": rows}, ensure_ascii=False, indent=2))
+            return 0
         print("最近活跃会话（分钟前 / id）：")
-        for rid, age in active_sessions(12):
-            print("  %7.1f  %s" % (age, rid))
+        for r in rows:
+            print("  %7.1f  %s" % (r["idle_min"], r["session"]))
         return 0
 
     base_id, cand_id = a.baseline, a.candidate
