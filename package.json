@@ -22,6 +22,7 @@
     "icon.svg",
     "locale/",
     "assets/",
+    "!assets/__pycache__/",
     "!assets/.audit_state/",
     "!assets/.query_state/",
     "!assets/lessons.jsonl",

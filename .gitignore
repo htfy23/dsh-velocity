@@ -22,3 +22,7 @@ Thumbs.db
 # 构建产物
 dsh-velocity.tgz
 dsh-velocity-*.tgz
+
+# Python 编译缓存（py_compile 产物，不该进包）
+__pycache__/
+*.pyc
