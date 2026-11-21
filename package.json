@@ -1,6 +1,6 @@
 {
   "name": "dsh-velocity",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Session velocity auditor: measures reclaimable wait time (blocking waits, blind sleeps, unmergeable commands, timeouts), tracks verified lessons, and reports the speedup percentage per round.",
   "license": "MIT",
   "keywords": [

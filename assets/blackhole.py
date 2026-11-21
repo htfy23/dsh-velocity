@@ -106,6 +106,7 @@ VERIFY_QUESTIONS = {
     "盲改缺验证": "改动之间为什么既没重读也没跑测试？如果这次改动没生效，能否从输出判断卡在哪一步？",
     "串行未并行": "这串调用里是否有互不依赖的项？有就并发（subagent / 后台作业 / 同一条消息多工具），确属依赖链就保持串行。",
     "subagent 串行": "这几个子任务分步起，是不是因为要看上一步的产出？不需要就该在同一条消息里并起——墙钟取 max 而不是 sum。",
+    "subagent 闲置": "这段长会话里有没有彼此无数据依赖的独立块？有就下次并起 subagent；确实是单点排查或严格依赖链，不拆是对的。",
 }
 
 STATUS_MEANING = {
@@ -1169,6 +1170,57 @@ def _subagent_serial_hole(calls, results, total, depth=0):
     }
 
 
+
+# 「subagent 闲置」门槛：会话要长到值得分工才报。短会话拆了反而更慢，
+# 误报会让审计本身失去可信度。
+SUBAGENT_IDLE_MIN_ACTIVE = 3600.0
+SUBAGENT_IDLE_MIN_CALLS = 100
+
+
+def _subagent_idle_hole(para, active, total_calls, rows, tool_t, calls,
+                        has_parallel_hole):
+    """subagent 闲置：长会话全程零委派。
+
+    这一条不是「实时可回收的等待」（那类由串行未并行判定），而是**规模维度的
+    结构性事实**：会话已经长到值得分工，却一次都没把子问题交出去。所以 sev
+    固定为 0，不计入速度总账，只作提示——把它算进可回收时长会把提示夸大成
+    不存在的浪费。
+
+    门槛刻意偏高：≥60 分钟活跃且 ≥100 次工具调用。串行未并行已经报过同类
+    问题时不重复报，避免对同一个会话打两枪。
+    """
+    if para.get("subagent", 0) > 0:
+        return None
+    if active < SUBAGENT_IDLE_MIN_ACTIVE:
+        return None
+    if total_calls < SUBAGENT_IDLE_MIN_CALLS:
+        return None
+    if has_parallel_hole:
+        return None
+
+    top = sorted(tool_t.items(), key=lambda kv: -kv[1])[:4]
+    # tool_t 存的是秒不是次数，标清单位，否则读成「调用了 5029 次」
+    tool_desc = ", ".join("%s %.0fmin" % (k, v / 60.0) for k, v in top) or "（无计时数据）"
+    return {
+        "kind": "subagent 闲置",
+        "sev": 0.0,
+        "ratio": 0,
+        "priority": 0,
+        "evidence": "会话活跃 %.0f 分钟、%d 次工具调用、%d 步，全程 0 次 subagent；主要工具 %s" % (
+            active / 60.0, total_calls, len(rows), tool_desc),
+        "detail": "整段长会话没有把任何子问题交出去：调查、修改、验证全挤在一个上下文里串行完成。"
+                  "这不是已经浪费掉的墙钟（sev 记 0，不计入可回收总时长），"
+                  "而是「规模没换成速度」的结构性提示",
+        "action": "回看有没有彼此无数据依赖的独立块——多文件/多会话/多 URL 同时查、"
+                  "多组独立命令、多份互不影响的产出。有就下次在同一条消息里并起 subagent，墙钟取 max；"
+                  "单点排查、严格依赖链（改代码→编译→测试）保持串行是对的",
+        "tools": [k for k, _v in top],
+        "ctx": _capped_ctx(itertools.chain(
+            ["subagent 闲置 零委派 串行 并行"],
+            (brief_args(c, 120) for c in list(calls.values())[:3])), 1200),
+    }
+
+
 # ---------------------------------------------------------------- analyze
 
 def analyze(evs, since_min=None, _depth=0):
@@ -1830,6 +1882,15 @@ def analyze(evs, since_min=None, _depth=0):
         if sub_hole is not None:
             holes.append(sub_hole)
 
+    # 8d) subagent 闲置：长会话零委派。规模维度的提示，sev 固定 0，
+    #     不进 SPEED_KINDS（它不代表已浪费的墙钟）。串行未并行已报则跳过。
+    if _depth == 0:
+        idle_hole = _subagent_idle_hole(
+            para, active, total_calls, rows, tool_t, calls,
+            any(h["kind"] == "串行未并行" for h in holes))
+        if idle_hole is not None:
+            holes.append(idle_hole)
+
     # 9) 盲改缺验证：同一文件 ≥3 次成功编辑，覆盖的窗口内既没有重读该文件，
     #    也没有跑测试。「改动是否有效」无法机械判定，这里只报代理事实：
     #    改了很多次却没有任何验证动作。已被「反复编辑同处」按 old_string
@@ -1967,6 +2028,7 @@ KNOWN_KINDS = [    "任务轮询", "无产出长段", "超时转后台",
     "盲等",
     "命令可合并",
     "subagent 串行",
+    "subagent 闲置",
 ]
 
 DEFAULT_LESSONS = [

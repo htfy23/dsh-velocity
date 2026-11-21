@@ -3,6 +3,42 @@
 Notable changes to `dsh-velocity`. This is the first public release; earlier
 internal iterations are not versioned here.
 
+## 1.0.4
+
+### Prompt: mechanical fan-out triggers instead of "independent subtasks"
+
+Measured over 393 sessions, `subagent` accounted for 0.26% of tool calls, and only
+7% of sessions used one at all. Part of that is the outage described in 1.0.3 — a
+prompt only reaches conversations started after a change, and 1.0.2 was broken for
+about a day, so the rule had almost no exposure. But the rule was also too
+abstract: "use subagents for independent subtasks" asks you to reason about
+dependencies before you are allowed to split, which is easy to skip under time
+pressure.
+
+Rule ④ now names mechanical triggers instead: ≥2 unrelated objects to inspect, ≥2
+groups of independent commands, ≥2 independent deliverables — fan them out. When
+unsure, prefer splitting: a wrong split costs seconds of startup, a skipped split
+costs minutes of serial wall clock.
+
+### New signal: `subagent 闲置`
+
+A session that ran ≥60 minutes with ≥100 tool calls and never delegated. `sev` is
+fixed at 0 and it stays out of `SPEED_KINDS` — it is not wall clock already
+wasted, so counting it as reclaimable would inflate the total. Suppressed when
+`串行未并行` already reported the same session.
+
+It is the lowest-priority signal, so the default `--top 5` can cut it off; pass
+`--top 10` on a long session. On the 500-minute session that produced this release
+it fires with:
+
+```
+会话活跃 502 分钟、1616 次工具调用、1601 步，全程 0 次 subagent；
+主要工具 ops_bash 84min, pwsh 26min, blackhole_batch_review 2min, plugin_manager 1min
+```
+
+### Tests
+
+603 engine tests (15 new), 128 plugin assertions.
 ## 1.0.3
 
 ### Fixed: the plugin failed to load on DSH 0.2.2-rc.3 ("异常" in the plugin list)
