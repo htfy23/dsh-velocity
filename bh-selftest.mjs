@@ -216,7 +216,7 @@ check('speedup has baseline+list', ['baseline', 'list'].every((k) => k in speedu
 // 端到端：list 模式必须真的跑起来并回文本（不是抛错、不是空）
 {
   const r = await speedup.execute({ list: true }, {})
-  const text = r?.content?.[0]?.text ?? ''
+  const text = typeof r === 'string' ? r : (r?.content?.[0]?.text ?? '')
   check('speedup list runs end-to-end', text.length > 0, text.slice(0, 60))
   check('speedup list names sessions', /session-|[0-9a-f]{8}/.test(text))
 }
@@ -224,10 +224,20 @@ check('speedup has baseline+list', ['baseline', 'list'].every((k) => k in speedu
 {
   const ids = (await import('node:fs')).readdirSync(join(DSH_HOME, 'sessions')).slice(0, 3)
   const r = await speedup.execute({ minutes: 60 }, {})
-  const text = r?.content?.[0]?.text ?? ''
+  const text = typeof r === 'string' ? r : (r?.content?.[0]?.text ?? '')
   check('speedup ab returns verdict', text.includes('本轮加速') || text.includes('数据不足'), text.slice(0, 60))
 }
 check('batch requires action', JSON.stringify(batch.parameters.required) === '["action"]')
+
+// 每个工具都必须声明 output —— DSH 0.2.2-rc.3 起缺了它整包 fiberPhase=failed，
+// 而且是「一个工具坏、全部工具不注册」。实测踩过一次，加守卫防复发。
+for (const t of captured.tools) {
+  check(`tool ${t.name} declares output`, t.output !== undefined && t.output.schema !== undefined,
+        JSON.stringify(t.output ?? null))
+  check(`tool ${t.name} output render is callable`, typeof t.output?.render === 'function')
+  check(`tool ${t.name} declares isConcurrencySafe`, typeof t.isConcurrencySafe === 'function')
+}
+
 check('batch is not concurrency safe', batch.isConcurrencySafe() === false)
 check('audit params are object schema', audit.parameters.type === 'object')
 check('audit params close additionalProperties', audit.parameters.additionalProperties === false)

@@ -879,6 +879,14 @@ function speedupTool(settings) {
       },
       additionalProperties: false,
     },
+    // DSH 0.2.2-rc.3 起要求每个工具声明 output；缺了它整包 fiberPhase=failed
+    // （实测诊断：tool "velocity_speedup" must declare output）。渲染统一交给
+    // render，execute 只返回字符串。
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: typeof value === 'string' ? value : String(value) }],
+    },
+    isConcurrencySafe: () => true,
     async execute(args, exec) {
       const script = resolveSpeedupScript(settings)
       if (script === undefined) {
@@ -916,22 +924,22 @@ function speedupTool(settings) {
         try {
           sessions = JSON.parse(text).sessions
         } catch {
-          return { content: [{ type: 'text', text: text || '(无活跃会话)' }] }
+          return text || '(无活跃会话)'
         }
         if (!Array.isArray(sessions) || sessions.length === 0) {
-          return { content: [{ type: 'text', text: '(无活跃会话)' }] }
+          return '(无活跃会话)'
         }
         const body = sessions.map((r) => `  ${r.idle_min.toFixed(1).padStart(7)} 分钟前  ${r.session}`)
-        return { content: [{ type: 'text', text: ['最近活跃会话（分钟前 / id）：', ...body].join('\n') }] }
+        return ['最近活跃会话（分钟前 / id）：', ...body].join('\n')
       }
       let doc
       try {
         doc = JSON.parse(text)
       } catch {
-        return { content: [{ type: 'text', text }] }
+        return text
       }
       if (doc?.baseline === undefined || doc?.candidate === undefined) {
-        return { content: [{ type: 'text', text: JSON.stringify(doc, null, 2) }] }
+        return JSON.stringify(doc, null, 2)
       }
       const pct = doc.speedup_pct
       const lines = [
@@ -947,7 +955,7 @@ function speedupTool(settings) {
       if (doc.candidate.waste_pct < 0.05) {
         lines.push('注意：新对话浪费率已接近 0，进一步下降空间有限（分母效应）。')
       }
-      return { content: [{ type: 'text', text: lines.join('\n') }] }
+      return lines.join('\n')
     },
   }
 }

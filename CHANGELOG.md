@@ -3,6 +3,36 @@
 Notable changes to `dsh-velocity`. This is the first public release; earlier
 internal iterations are not versioned here.
 
+## 1.0.3
+
+### Fixed: the plugin failed to load on DSH 0.2.2-rc.3 ("异常" in the plugin list)
+
+DSH 0.2.2-rc.3 requires every tool to declare `output: { schema, render }`.
+`velocity_speedup`, added in 1.0.2, did not — and one tool violating that contract
+fails the whole plugin's fiber:
+
+```
+fiberPhase: failed
+diagnostic: tool "velocity_speedup" must declare output { schema, render, presentationMeta? }
+```
+
+Because the bundle fails as a unit, none of the four tools registered — including
+`blackhole_audit`. So 1.0.2 was unusable on this host version even though its
+other three tools were correct. The plugin list showed the card with "异常".
+
+Fix: `velocity_speedup` declares `output` (string schema plus `render`) and returns
+a plain string instead of the legacy `{ content: [{ type: 'text' }] }` shape, which
+is what the other three tools already did.
+
+Verified live: after toggling the entry off and on, `fiberPhase` moved to
+`active`, all four tool schemas registered, and both `list` and the A/B mode
+returned real results through the DSH tool executor.
+
+### Tests
+
+The self-test now checks, for every registered tool, that `output.schema` exists,
+`output.render` is callable, and `isConcurrencySafe` is declared. One bad tool
+failing a whole bundle is cheap to guard against; 128 assertions.
 ## 1.0.2
 
 ### New signal: `subagent 串行`
