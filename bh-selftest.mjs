@@ -130,10 +130,22 @@ check('module name', name === 'dsh-velocity', name)
   check('locale description non-empty', (zh.meta.description ?? '').length > 20)
   check('locale description drops the old name', !/黑洞/.test(zh.meta.description))
 }
-// 纯 Host 插件也要声明 client.platform，否则 Plugins 页拿不到卡片信息
+// 浏览器端声明的硬约束（曾经把这个插件连宿主一起打挂过）：
+// dsh.client 一旦声明，dsh-client-modules 就去 exports 里找 "./client" bundle；
+// 找不到就抛错，而 client-modules 是 required 插件 —— 整个 DSH 起不来，弹
+// 「应用无法启动或已意外停止」。本插件是纯 Host 端（4 个工具都在 Host 注册，
+// 没有 client 半），所以正确做法是**不声明 dsh.client**。
+// 实测崩溃：2026-11-22 21:49，dsh-velocity declares dsh.client but exports no
+// "./client" bundle。
 {
   const pkg = JSON.parse(readFileSync(join(PLUGIN, 'package.json'), 'utf8'))
-  check('dsh.client.platform declared', pkg.dsh?.client?.platform === 'web', JSON.stringify(pkg.dsh?.client))
+  const hasClient = pkg.dsh?.client !== undefined
+  const hasClientExport = Object.keys(pkg.exports ?? {}).includes('./client')
+  check('dsh.client only when a ./client bundle exists', !hasClient || hasClientExport,
+        JSON.stringify({ client: pkg.dsh?.client, clientExport: hasClientExport }))
+  const clientDir = join(PLUGIN, 'client')
+  check('no client/ directory for a host-only plugin', !existsSync(clientDir))
+}
 // 宿主依赖必须声明：插件不 import 任何 @deepseek-ai/* 包（只用 node: 内置），
 // 但它依赖 Host 提供的 ctx.tools / ctx.get('systemPrompt')。声明 peer 让装在
 // 过旧宿主上时能被依赖检查拦下，而不是运行时静默失效。
@@ -158,7 +170,6 @@ check('module name', name === 'dsh-velocity', name)
   check('CHANGELOG documents current version', changelog.includes(`## ${ver}`), ver)
   check('CHANGELOG lists every tool', ['blackhole_audit', 'blackhole_lessons',
     'blackhole_batch_review', 'velocity_speedup'].every((t) => changelog.includes(t)))
-}
 }
 check('injects tools', Array.isArray(inject) && inject.includes('tools'), JSON.stringify(inject))
 apply(makeCtx())

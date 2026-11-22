@@ -1,6 +1,6 @@
 {
   "name": "dsh-velocity",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Session velocity auditor for DeepSeek Harness: measures reclaimable wait time (background jobs blocked on, blind sleeps, unmergeable commands, serial subagent fan-out, timeouts), keeps a verified lesson library, and A/Bs a new conversation against an old one to report the speedup percentage.",
   "license": "MIT",
   "repository": {
@@ -50,11 +50,6 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "immediately": false,
-      "inject": []
     }
   },
   "peerDependencies": {

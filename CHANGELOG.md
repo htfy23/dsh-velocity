@@ -3,6 +3,34 @@
 Notable changes to `dsh-velocity`. This is the first public release; earlier
 internal iterations are not versioned here.
 
+## 1.0.5
+
+### Fixed: the plugin prevented DSH from starting
+
+1.0.4 declared `dsh.client` in `package.json` while shipping no `./client`
+bundle. `@deepseek-ai/dsh-client-modules` is a required plugin, and it resolves
+every declaration:
+
+```
+client-modules: dsh-velocity declares dsh.client but exports no "./client" bundle
+```
+
+That error fails `client-modules`, which fails startup as a whole — the desktop
+app showed "应用无法启动或已意外停止" and offered to disable third-party plugins.
+So a plugin whose four tools all live on the Host side could stop the entire app
+from booting.
+
+The `dsh.client` block was added on the mistaken belief that a client half is
+what makes the Plugins page render a card. It is not: the card, the locale
+title, and the tools all come from the bundle and the Host side. This release
+removes the declaration; the plugin is Host-only, and that is a complete,
+valid shape.
+
+The self-test previously *required* `dsh.client.platform === 'web'`, which is how
+the bad block kept passing review. That assertion is replaced with the correct
+invariant: declare `dsh.client` only when `exports['./client']` exists. Reverting
+the fix now fails the test with
+`{"client":{"platform":"web"},"clientExport":false}`.
 ## 1.0.4
 
 ### Prompt: mechanical fan-out triggers instead of "independent subtasks"
