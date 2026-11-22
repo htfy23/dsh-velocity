@@ -1,8 +1,16 @@
 {
   "name": "dsh-velocity",
   "version": "1.0.4",
-  "description": "Session velocity auditor: measures reclaimable wait time (blocking waits, blind sleeps, unmergeable commands, timeouts), tracks verified lessons, and reports the speedup percentage per round.",
+  "description": "Session velocity auditor for DeepSeek Harness: measures reclaimable wait time (background jobs blocked on, blind sleeps, unmergeable commands, serial subagent fan-out, timeouts), keeps a verified lesson library, and A/Bs a new conversation against an old one to report the speedup percentage.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/htfy23/dsh-velocity.git"
+  },
+  "homepage": "https://github.com/htfy23/dsh-velocity#readme",
+  "bugs": {
+    "url": "https://github.com/htfy23/dsh-velocity/issues"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -56,6 +64,5 @@
     "@deepseek-ai/dsh": {
       "optional": true
     }
-  },
-  "private": true
+  }
 }
